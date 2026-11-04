@@ -1,45 +1,41 @@
-"""
-Legacy Insecure User Portal (Vulnerable Baseline)
-Contains deliberate vulnerabilities: SQL Injection, Command Injection, Plaintext Secrets.
-"""
+"""Non-executing descriptions of insecure patterns for defensive comparison."""
 
-import sqlite3
-import os
+from __future__ import annotations
 
-DB_FILE = "insecure_users.db"
+from dataclasses import asdict, dataclass
 
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS users (username TEXT, password TEXT, role TEXT)")
-    c.execute("DELETE FROM users")
-    # Vulnerability 1: Plaintext password storage
-    c.execute("INSERT INTO users VALUES ('admin', 'SuperSecretAdminPass123', 'admin')")
-    c.execute("INSERT INTO users VALUES ('alice', 'alicepassword', 'user')")
-    conn.commit()
-    conn.close()
 
-def login_vulnerable(username, password):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    # Vulnerability 2: SQL Injection via direct f-string formatting
-    query = f"SELECT role FROM users WHERE username = '{username}' AND password = '{password}'"
-    print(f"[DEBUG QUERY] {query}")
-    try:
-        c.execute(query)
-        res = c.fetchone()
-        conn.close()
-        return res[0] if res else None
-    except Exception as e:
-        # Vulnerability 3: Verbose error leaking schema internals
-        print(f"[LEAK ERROR] Database error: {e}")
-        return None
+@dataclass(frozen=True)
+class SecurityComparison:
+    """Describe a vulnerable design and its hardened architectural control."""
 
-def ping_user_host_vulnerable(hostname):
-    # Vulnerability 4: OS Command Injection via unvalidated shell string
-    cmd = f"ping -c 1 {hostname}"
-    os.system(cmd)
+    area: str
+    vulnerable_design: str
+    defensive_control: str
 
-if __name__ == "__main__":
-    init_db()
-    print("Insecure authentication portal initialized.")
+
+COMPARISONS = (
+    SecurityComparison(
+        area="Database access",
+        vulnerable_design="Build query text from untrusted input; this demo does not execute it.",
+        defensive_control="Use fixed SQL statements and bind values through DB-API parameters.",
+    ),
+    SecurityComparison(
+        area="Process execution",
+        vulnerable_design="Pass user-controlled command text to a shell; this demo never runs it.",
+        defensive_control="Validate a host and pass a fixed argv list with shell disabled and a timeout.",
+    ),
+    SecurityComparison(
+        area="Credential storage",
+        vulnerable_design="Store a password directly; the application does not create such records.",
+        defensive_control="Store a per-user PBKDF2-HMAC-SHA256 digest and random salt.",
+    ),
+)
+
+
+def comparison_examples() -> list[dict[str, str]]:
+    """Return inert comparison data for the security diagnostics UI."""
+    return [asdict(example) for example in COMPARISONS]
+
+
+__all__ = ["COMPARISONS", "SecurityComparison", "comparison_examples"]
